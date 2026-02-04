@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cloud Data Leakage Prevention System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Cloud Data Leakage Prevention System</h1>
+    <p class="subtitle">
+        Rule-based inspection of data before cloud storage
+    </p>
+
+    <div class="upload-box">
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Upload File</button>
+        <p id="result" class="result"></p>
+    </div>
+
+    <h2>Upload Audit Logs</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody id="logs">
+            <tr>
+                <td colspan="4">No logs available</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
