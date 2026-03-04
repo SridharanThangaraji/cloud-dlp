@@ -1,0 +1,12 @@
+{
+  "name": "Cloud DLP",
+  "short_name": "CloudDLP",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#00f2ff",
+  "description": "Upload files, scan for sensitive data, encrypt allowed content, and review audit logs.",
+  "icons": []
+}
+

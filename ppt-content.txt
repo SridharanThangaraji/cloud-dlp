@@ -1,0 +1,91 @@
+Slide – Module 1: Rule‑Based Content Inspection
+Purpose
+Inspect file contents before upload to detect sensitive information (PII, credentials, etc.).
+Core Idea
+Use regex‑based rules on decoded text to flag patterns such as:
+Email addresses, phone numbers, passwords / secrets, IDs.
+Flow
+Backend receives file → decodes bytes to text → calls DLPDetector.scan(text).
+For each rule in policies.json, if regex matches, rule name is added to findings.
+If findings is non‑empty, the upload is BLOCKED and never written to storage.
+Benefits
+Transparent and explainable: rules live in a simple JSON file.
+Easy to extend with new patterns without changing core code.
+Slide – Module 2: Cryptographic Hashing (Overview & Purpose)
+Purpose
+Ensure that stored (encrypted) files are not silently modified or corrupted.
+Core Idea
+Encrypt each allowed file and compute a SHA‑256 hash of the encrypted blob.
+Why hash the encrypted data?
+Integrity is verified on the exact bytes stored on disk.
+Any change to the encrypted file (bit‑flip, truncation, replacement) changes the hash.
+Where it fits
+Runs only after a file passes DLP inspection.
+Connects upload logic with the integrity verification endpoint.
+Slide – Module 2: Flow & Data Path
+Upload path
+Allowed upload → encrypt_and_hash(content):
+Load Fernet key from environment or .encryption_key file.
+Encrypt plaintext bytes with Fernet.
+Compute SHA‑256(encrypted_bytes) and store as file_hash.
+Save encrypted bytes to cloud_storage/uuid.bin.
+Store metadata in StoredAsset:
+filename, storage_path, file_hash, created_at.
+Verification path (/assets/{id}/verify)
+Read encrypted file from disk via storage_path.
+Recompute SHA‑256(encrypted_bytes) and compare with DB file_hash.
+Return:
+verified: true + “Hash matches” if equal.
+verified: false + “Hash mismatch” or “File missing on storage”.
+Slide – Module 2: Security & Benefits
+Security properties
+Detects any tampering with stored encrypted files (even if DB is unchanged).
+Helps prove that “what we stored is still what we originally encrypted.”
+Operational advantages
+Simple, deterministic verification endpoint for demos and audits.
+Can be run periodically or on demand to check storage health.
+Extensibility
+Easy to plug in other hash algorithms or HMACs if required.
+Same pattern works when migrating from local disk to S3/MinIO.
+Slide – Module 3: Secure Violation Logging (Overview & Purpose)
+Purpose
+Maintain a reliable audit trail for every upload attempt and its outcome.
+Core Idea
+Store structured log entries in SQLite with:
+filename, status (ALLOWED / BLOCKED / ERROR), reason, timestamp.
+When it runs
+On every /upload code path:
+Size or type failure.
+DLP violation.
+Successful encrypted storage.
+Internal errors (scan/storage issues).
+Slide – Module 3: Logging Flow & UI Integration
+Backend flow
+/upload decides outcome → calls:
+log_event(filename, status, reasons[]).
+log_event:
+Opens DB session (get_db_session).
+Creates UploadLog row.
+Commits or rolls back safely using a context manager.
+Frontend /logs page
+Fetches GET /logs and shows:
+Filename, colored status badge, reason text, time.
+Features:
+Status filter (Allowed / Blocked / Error).
+Search by filename or reason.
+Auto‑refresh when Logs page is active.
+CSV export button for offline analysis.
+Slide – Module 3: Benefits & Use Cases
+Benefits
+Full visibility into:
+Which uploads were allowed or blocked.
+Exact reasons for blocking (e.g. “email, password”).
+Frequency of errors and misconfigurations.
+Makes it easy to demonstrate compliance during reviews.
+Use cases
+Security analysis:
+Identify common violation patterns (e.g., passwords in PDFs).
+Tuning DLP rules:
+Adjust regexes based on real‑world violations seen in logs.
+Teaching / demo:
+Show live logs updating as students upload safe vs. sensitive files.

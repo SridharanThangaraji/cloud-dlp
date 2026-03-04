@@ -1,0 +1,124 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
+
+\title{\textbf{Cloud DLP: A Lightweight Rule-Based Data Leakage Prevention System for Cloud Uploads}}
+
+\author{
+  Author Name$^{1}$ \\
+  $^{1}$Department of Computer Science, Your University \\
+  \texttt{author@university.edu}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Organizations moving workloads to the cloud face increased risk of accidental or malicious exposure of sensitive data. We present \emph{Cloud DLP}, a lightweight, rule-based Data Leakage Prevention (DLP) system that inspects file uploads before they reach cloud storage. The system validates file size and type, scans content against configurable regex policies to detect personally identifiable information (PII) and credentials, and persists a full audit trail of allowed, blocked, and failed uploads. Implemented as a REST API backend with a web dashboard, Cloud DLP is designed for easy integration with existing storage pipelines and for extension to production backends (e.g., S3/MinIO). We describe the architecture, implementation, and design choices, and report on correctness of the detection engine via unit tests. The prototype demonstrates that a minimal, policy-driven DLP layer can effectively reduce exposure of sensitive data at upload time while remaining simple to deploy and maintain.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Cloud adoption has made it common for users to upload files directly to object storage or through web applications. Without inspection, sensitive data---such as email addresses, phone numbers, or passwords---can be stored in plain sight, leading to compliance violations and breach risk. Data Leakage Prevention (DLP) systems aim to detect and block such content before it is persisted.
+
+We present \emph{Cloud DLP}, a lightweight DLP system that sits in front of cloud uploads. It performs three main functions: (1)~validation of file size and MIME type, (2)~content scanning using configurable regex-based policies to detect PII and credential patterns, and (3)~persistent audit logging of every upload outcome. Files that pass validation and scanning are forwarded to (simulated) cloud storage; others are blocked with a clear reason. The design prioritizes simplicity and auditability so that it can be integrated into existing pipelines or extended with stronger detection (e.g., ML-based classifiers) and real cloud backends.
+
+The contributions of this work are: (a)~an open, modular architecture for upload-time DLP with a REST API and a web dashboard, (b)~a policy-driven detection engine with configurable rules (email, phone, password patterns), (c)~consistent audit logging with proper handling of errors and HTTP semantics, and (d)~a working prototype and test suite that can serve as a baseline for further research or deployment.
+
+The rest of the paper is organized as follows. Section~\ref{sec:related} briefly reviews related work. Section~\ref{sec:design} describes the system design and data flow. Section~\ref{sec:impl} details the implementation. Section~\ref{sec:eval} presents a small evaluation. Section~\ref{sec:conc} concludes.
+
+\section{Related Work and Background}
+\label{sec:related}
+
+DLP solutions range from enterprise suites (e.g., endpoint or network DLP) to cloud-native services (e.g., CSP-native classification and policies). Many rely on a combination of pattern matching, keyword lists, and machine learning for document classification and PII detection~\cite{b1,b2}. Our focus is on a minimal, rule-based layer at the upload path: we do not aim to replace full-featured DLP but to provide a transparent, auditable gate that can be extended.
+
+Regex-based policies are widely used for structured PII (email, phone, credit card) and are easy to tune per jurisdiction. Cloud DLP follows this approach and keeps rules in a single JSON configuration file so that operators can add or modify patterns without code changes. Similar ideas appear in open-source and commercial DLP offerings; our contribution is the integrated design (validation, scan, storage, logging) and the open prototype with a clear API and dashboard.
+
+\section{System Design and Architecture}
+\label{sec:design}
+
+\subsection{High-Level Data Flow}
+
+The system follows a linear pipeline for each upload.
+
+\begin{enumerate}
+  \item \textbf{Upload.} The client (web dashboard or any HTTP client) sends the file via \texttt{POST /upload} (multipart/form-data).
+  \item \textbf{Validation.} The server checks file size (e.g., $\leq$ 5\,MB) and MIME type (e.g., \texttt{text/plain}, \texttt{application/json}, \texttt{text/csv}, \texttt{application/pdf}). If validation fails, the request is rejected with HTTP 400 and the event is logged as ERROR.
+  \item \textbf{DLP scan.} File content is decoded as text (non-UTF-8 handled with error replacement) and scanned against a set of regex rules. Each rule is named (e.g., \texttt{email}, \texttt{phone}, \texttt{password}); if any rule matches, the upload is \emph{blocked} and the list of matched categories is returned and logged.
+  \item \textbf{Storage.} If the file passes validation and scanning, it is written to the configured storage backend (in the prototype, a local directory simulating cloud storage). On storage failure, the server returns HTTP 500 and logs the error.
+  \item \textbf{Logging.} Every outcome---ALLOWED, BLOCKED, or ERROR---is written to a persistent audit log (SQLite) with filename, status, reason, and UTC timestamp.
+\end{enumerate}
+
+\subsection{Component Overview}
+
+\begin{itemize}
+  \item \textbf{API layer (\texttt{main.py}).} FastAPI application exposing \texttt{/upload}, \texttt{/logs}, and \texttt{/health}. It enforces size/MIME checks, invokes the DLP engine, calls the storage service, and uses the logger for every outcome. Client errors (validation) return 400; server errors (scan or storage) return 500, with a JSON body \texttt{\{ "detail": \{ "status", "reason" \} \}} for the frontend.
+  \item \textbf{Database (\texttt{database/models.py}).} SQLAlchemy ORM with an \texttt{UploadLog} model (id, filename, status, reason, timestamp). Sessions are managed via a context manager so that commit/rollback and connection close always run, avoiding leaks on exceptions.
+  \item \textbf{DLP engine (\texttt{dlp\_engine/}).} A \texttt{DLPDetector} class loads regex rules from \texttt{policies.json} and exposes \texttt{scan(text)} returning a list of matched rule names. Rules are key--value pairs (e.g., \texttt{email}, \texttt{phone}, \texttt{password}) with regex patterns.
+  \item \textbf{Services.} \texttt{logger}: appends one row to \texttt{upload\_logs}. \texttt{storage}: writes file bytes to the configured path (local directory in the prototype; replaceable by S3/MinIO).
+  \item \textbf{Frontend.} Static HTML/CSS/JS dashboard: file picker and drag-and-drop, display of scan result (ALLOWED/BLOCKED/ERROR), and a table of audit logs refreshed periodically. All user-controlled content is escaped to prevent XSS.
+\end{itemize}
+
+\subsection{Design Choices}
+
+\textbf{Session handling.} All database access uses a \texttt{get\_db\_session()} context manager that commits on success and rolls back on exception, then always closes the session. This avoids connection leaks and keeps the audit log consistent.
+
+\textbf{Timestamps.} Log timestamps are stored in UTC using \texttt{datetime.now(timezone.utc)} so that ordering and reporting are timezone-safe.
+
+\textbf{Error semantics.} Validation failures are treated as client errors (400); scan or storage failures as server errors (500). In all error cases the event is still written to the audit log so that operators have a complete trail.
+
+\section{Implementation}
+\label{sec:impl}
+
+\subsection{Detection Policies}
+
+The prototype ships with three rule categories, defined in \texttt{policies.json}:
+
+\begin{itemize}
+  \item \textbf{email:} Pattern \texttt{[a-zA-Z0-9\_.+-]+@[a-zA-Z0-9-]+\textbackslash.[a-zA-Z0-9-.]+} for typical email addresses.
+  \item \textbf{password:} Case-insensitive \texttt{(password|pwd)[\textbackslash s:=]+.\{6,\}} to catch lines like \texttt{password: secret123}.
+  \item \textbf{phone:} \texttt{\textbackslash b[6-9][0-9]\{9\}\textbackslash b} for 10-digit Indian-style mobile numbers.
+\end{itemize}
+
+Adding or changing rules does not require code changes; only the JSON file is edited. The detector compiles each pattern and runs \texttt{re.search} over the decoded text; multiple matches (e.g., both email and phone) are reported as a list.
+
+\subsection{API and Frontend}
+
+The REST API is implemented with FastAPI. The upload handler reads the file into memory, runs validation and \texttt{detector.scan()}, then either returns BLOCKED/ALLOWED or raises \texttt{HTTPException} with the appropriate status and a JSON detail body. The frontend checks \texttt{response.ok} and, for non-OK responses, displays \texttt{detail.reason} so that users see clear error messages. Logs are rendered in a table with HTML escaping to prevent injection.
+
+\subsection{Testing}
+
+The DLP engine is covered by unit tests (pytest): safe text (no findings), single-category hits (email, phone, password), and multiple findings in one text. All tests pass; the suite can be extended to API or integration tests.
+
+\section{Evaluation}
+\label{sec:eval}
+
+We focus on correctness of the detection engine and the robustness of the pipeline.
+
+\textbf{Detection correctness.} The five unit tests verify that (1)~text with no PII yields an empty list, (2)~an email substring is detected as \texttt{email}, (3)~a 10-digit number matching the phone pattern is detected as \texttt{phone}, (4)~a line containing \texttt{password: ...} is detected as \texttt{password}, and (5)~a string containing both email and phone yields both labels. This ensures that the policy loading and regex application behave as intended.
+
+\textbf{Pipeline behavior.} Validation (size, MIME) and error handling (session lifecycle, logging on all outcomes, HTTP 400/500) have been implemented and tested manually. The audit log contains every upload attempt with status and reason, and the dashboard displays them with correct escaping.
+
+\textbf{Limitations.} The current rules are regex-only and may have false positives/negatives (e.g., phone pattern is region-specific). No machine learning or document-level classification is used. Performance on very large files is limited by in-memory decoding and single-threaded scan; for production, streaming and async storage would be considered.
+
+\section{Conclusion}
+\label{sec:conc}
+
+We presented Cloud DLP, a lightweight rule-based DLP system for cloud uploads. It validates file size and type, scans content against configurable regex policies for PII and credentials, and maintains a full audit log of allowed, blocked, and failed uploads. The design emphasizes simplicity, auditability, and easy extension to real cloud storage and richer detection. The prototype, including REST API, dashboard, and tests, is available and can serve as a baseline for further research or deployment in controlled environments.
+
+\begin{thebibliography}{9}
+\bibitem{b1} M. Gupta, J. Walp, and R. Sharman, ``Managing the risk of data leakage in the cloud,'' in Proc. IEEE Int. Conf. Cloud Comput., 2014, pp. 601--608.
+\bibitem{b2} Cloud Security Alliance, ``Data Loss Prevention in the Cloud,'' 2019. [Online]. Available: \url{https://cloudsecurityalliance.org}
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Database and local storage
+*.db
+backend/cloud_storage/
+backend/.encryption_key
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+*~
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Test / demo artifacts (optional: remove if you want to track them)
+backend/normal_test.txt
+backend/sensitive_test.txt
+backend/too_large_test.txt
+backend/test_image.jpg
+backend/cloud_storage/normal_test.txt

@@ -2,43 +2,274 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Cloud Data Leakage Prevention System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cloud DLP</title>
+    <meta name="theme-color" content="#00f2ff">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="logo">Cloud DLP</span>
+            <span class="tagline">Secure assets</span>
+            <div class="health-wrap">
+                <span class="health-dot" id="healthDot" title="Backend status"></span>
+                <span class="health-label" id="healthLabel">Checking…</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-link active" data-page="dashboard">
+                <span class="nav-icon" aria-hidden="true">▣</span>
+                Dashboard
+            </a>
+            <a href="#" class="nav-link" data-page="upload">
+                <span class="nav-icon" aria-hidden="true">↑</span>
+                Upload
+            </a>
+            <a href="#" class="nav-link" data-page="assets">
+                <span class="nav-icon" aria-hidden="true">◇</span>
+                Assets
+            </a>
+            <a href="#" class="nav-link" data-page="logs">
+                <span class="nav-icon" aria-hidden="true">≡</span>
+                Audit Logs
+            </a>
+            <a href="#" class="nav-link" data-page="about">
+                <span class="nav-icon" aria-hidden="true">ℹ</span>
+                About
+            </a>
+            <a href="#" class="nav-link" data-page="architecture">
+                <span class="nav-icon" aria-hidden="true">◫</span>
+                Architecture
+            </a>
+            <a href="#" class="nav-link" data-page="policies">
+                <span class="nav-icon" aria-hidden="true">⚙</span>
+                Policies
+            </a>
+            <a href="#" class="nav-link" data-page="settings">
+                <span class="nav-icon" aria-hidden="true">◎</span>
+                Settings
+            </a>
+        </nav>
+    </aside>
+    <div class="main-wrap">
+    <main class="main">
+        <header class="page-header">
+            <h1 class="page-title" id="pageTitle">Dashboard</h1>
+            <p class="page-desc" id="pageDesc">Overview of uploads and stored assets</p>
+        </header>
 
-<div class="container">
-    <h1>Cloud Data Leakage Prevention System</h1>
-    <p class="subtitle">
-        Rule-based inspection of data before cloud storage
-    </p>
+        <!-- Dashboard page -->
+        <section class="page active" id="page-dashboard" data-page="dashboard">
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <span class="stat-value" id="statTotal">—</span>
+                    <span class="stat-label">Total uploads</span>
+                </div>
+                <div class="stat-card stat-allowed">
+                    <span class="stat-value" id="statAllowed">—</span>
+                    <span class="stat-label">Allowed</span>
+                </div>
+                <div class="stat-card stat-blocked">
+                    <span class="stat-value" id="statBlocked">—</span>
+                    <span class="stat-label">Blocked</span>
+                </div>
+                <div class="stat-card stat-errors">
+                    <span class="stat-value" id="statErrors">—</span>
+                    <span class="stat-label">Errors</span>
+                </div>
+                <div class="stat-card stat-assets">
+                    <span class="stat-value" id="statAssets">—</span>
+                    <span class="stat-label">Stored assets</span>
+                </div>
+            </div>
+            <div class="card dashboard-chart-card" id="dashboardChartCard">
+                <p class="chart-title">Upload distribution</p>
+                <div class="chart-bars" id="chartBars" aria-hidden="true">
+                    <div class="chart-bar-wrap"><div class="chart-bar bar-allowed" id="barAllowed"></div><span class="chart-label">Allowed</span></div>
+                    <div class="chart-bar-wrap"><div class="chart-bar bar-blocked" id="barBlocked"></div><span class="chart-label">Blocked</span></div>
+                    <div class="chart-bar-wrap"><div class="chart-bar bar-errors" id="barErrors"></div><span class="chart-label">Errors</span></div>
+                </div>
+            </div>
+            <div class="card dashboard-actions">
+                <p class="muted">Quick actions</p>
+                <div class="action-buttons">
+                    <button type="button" class="btn-secondary" data-goto="upload">Upload a file</button>
+                    <button type="button" class="btn-secondary" data-goto="assets">View assets</button>
+                    <button type="button" class="btn-secondary" data-goto="logs">View audit logs</button>
+                </div>
+            </div>
+        </section>
 
-    <div class="upload-box">
-        <input type="file" id="fileInput">
-        <button onclick="uploadFile()">Upload File</button>
-        <p id="result" class="result"></p>
+        <!-- Upload page -->
+        <section class="page" id="page-upload" data-page="upload">
+            <div class="card">
+                <p class="upload-hint muted">Max 5 MB. Allowed: .txt, .json, .csv, .pdf</p>
+                <div class="demo-samples" id="demoSamples">
+                    <span class="muted">Demo files:</span>
+                    <button type="button" class="btn-sm btn-demo" id="demoSafe">Safe sample</button>
+                    <button type="button" class="btn-sm btn-demo btn-demo-sensitive" id="demoSensitive">Sensitive sample</button>
+                </div>
+                <label class="upload-zone" id="dropZone">
+                    <span class="upload-icon" aria-hidden="true">📁</span>
+                    <span id="fileNameDisplay">Click or drag file to scan</span>
+                    <input type="file" id="fileInput" accept=".txt,.json,.csv,.pdf">
+                </label>
+                <button type="button" class="btn-primary" id="btnUpload">Run Security Scan</button>
+                <div id="uploadResult" class="result" role="status" aria-live="polite"></div>
+            </div>
+        </section>
+
+        <!-- Assets page -->
+        <section class="page" id="page-assets" data-page="assets">
+            <div class="card">
+                <div class="card-toolbar">
+                    <span class="toolbar-title">Stored assets</span>
+                    <div class="toolbar-right">
+                        <input type="search" id="assetSearch" class="search-input" placeholder="Search by filename or hash…" aria-label="Search assets">
+                        <button type="button" class="btn-sm btn-refresh" id="refreshAssets" title="Refresh">↻ Refresh</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Hash</th>
+                                <th>Stored</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="assetsBody">
+                            <tr><td colspan="5" class="muted">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="assetsEmpty" style="display:none">
+                    <p class="empty-title">No stored assets</p>
+                    <p class="empty-desc">Files that pass the security scan are encrypted and stored here.</p>
+                    <button type="button" class="btn-secondary" data-goto="upload">Upload a file</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audit Logs page -->
+        <section class="page" id="page-logs" data-page="logs">
+            <div class="card">
+                <div class="card-toolbar">
+                    <span class="toolbar-title">Audit log</span>
+                    <div class="toolbar-right">
+                        <input type="search" id="logSearch" class="search-input" placeholder="Search by filename or reason…" aria-label="Search logs">
+                        <select id="logFilter" class="filter-select" title="Filter by status">
+                            <option value="">All statuses</option>
+                            <option value="ALLOWED">Allowed</option>
+                            <option value="BLOCKED">Blocked</option>
+                            <option value="ERROR">Error</option>
+                        </select>
+                        <button type="button" class="btn-sm btn-refresh" id="exportLogsCsv" title="Export as CSV">Export CSV</button>
+                        <button type="button" class="btn-sm btn-refresh" id="refreshLogs" title="Refresh">↻ Refresh</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsBody">
+                            <tr><td colspan="4" class="muted">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="logsEmpty" style="display:none">
+                    <p class="empty-title">No audit logs</p>
+                    <p class="empty-desc">Upload attempts will appear here.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- About page -->
+        <section class="page" id="page-about" data-page="about">
+            <div class="card about-card">
+                <h2 class="about-heading">Cloud DLP System</h2>
+                <p class="about-desc">A Data Loss Prevention system for scanning uploads, encrypting allowed content, and maintaining secure audit logs with integrity verification.</p>
+                <h3 class="about-sub">Project modules</h3>
+                <ul class="about-list">
+                    <li><strong>Module 1:</strong> Rule-Based Content Inspection — regex-based detection of PII (email, phone, password patterns).</li>
+                    <li><strong>Module 2:</strong> Cryptographic Hashing for Integrity — SHA-256 of encrypted content for tamper detection.</li>
+                    <li><strong>Module 3:</strong> Secure Violation Logging — audit trail for every upload attempt.</li>
+                    <li><strong>Module 4:</strong> User-Defined Security Policies — configurable detection rules (see Policies).</li>
+                    <li><strong>Module 5:</strong> Performance &amp; Cloud Integration — encrypted storage, optional cloud backend.</li>
+                </ul>
+                <h3 class="about-sub">Tech stack</h3>
+                <p class="tech-stack">Backend: FastAPI, SQLAlchemy, Cryptography (Fernet), SQLite. Frontend: vanilla HTML/CSS/JS. DLP: regex policies (JSON).</p>
+                <p class="about-footer muted">Academic project — Cloud Security / DLP</p>
+            </div>
+        </section>
+
+        <!-- Architecture page -->
+        <section class="page" id="page-architecture" data-page="architecture">
+            <div class="card">
+                <h2 class="about-heading">System architecture</h2>
+                <div class="arch-diagram">
+                    <pre class="arch-pre"><code>┌─────────────┐     POST /upload      ┌──────────────────────────────────┐
+│   Frontend  │ ───────────────────► │  FastAPI backend                  │
+│  (Browser)  │                      │  • Validate size / MIME           │
+└─────────────┘                      │  • DLP scan (regex policies)       │
+       │                              │  • Encrypt + hash (Fernet, SHA-256)│
+       │ GET /stats, /logs, /assets   │  • Store encrypted → DB + disk      │
+       └─────────────────────────────┤  • Log every attempt → upload_logs  │
+                                      └───────────────┬────────────────────┘
+                                                      │
+                    ┌─────────────────────────────────┼─────────────────────────────────┐
+                    ▼                 ▼               ▼                 ▼
+              ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────┐
+              │ DLP      │    │ Logger   │    │ Crypto   │    │ SQLite +     │
+              │ Engine   │    │ (audit)  │    │ Storage  │    │ cloud_storage│
+              └──────────┘    └──────────┘    └──────────┘    └──────────────┘</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Policies page -->
+        <section class="page" id="page-policies" data-page="policies">
+            <div class="card">
+                <div class="card-toolbar">
+                    <span class="toolbar-title">Active detection policies</span>
+                    <button type="button" class="btn-sm btn-refresh" id="refreshPolicies" title="Refresh">↻ Refresh</button>
+                </div>
+                <p class="muted policies-desc">Rules used to detect sensitive data in uploaded content. Matching content causes the file to be blocked.</p>
+                <div id="policiesList" class="policies-list">
+                    <p class="muted">Loading…</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings page -->
+        <section class="page" id="page-settings" data-page="settings">
+            <div class="card">
+                <h2 class="about-heading">System settings</h2>
+                <p class="muted">Read-only view of server configuration.</p>
+                <div id="settingsContent" class="settings-grid">
+                    <p class="muted">Loading…</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="app-footer">
+        <span>Cloud DLP</span>
+        <span class="footer-sep">·</span>
+        <span>Academic Project</span>
+        <span class="footer-sep">·</span>
+        <span id="footerVersion">—</span>
+    </footer>
     </div>
-
-    <h2>Upload Audit Logs</h2>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Filename</th>
-                <th>Status</th>
-                <th>Reason</th>
-                <th>Timestamp</th>
-            </tr>
-        </thead>
-        <tbody id="logs">
-            <tr>
-                <td colspan="4">No logs available</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<script src="script.js"></script>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+    <script src="script.js"></script>
 </body>
 </html>
-
